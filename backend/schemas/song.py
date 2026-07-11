@@ -8,6 +8,7 @@ class SongBase(BaseModel):
     artist: str
     added_by: str
     source: str
+    external_url: str | None = None
 
 
 class SongCreate(SongBase):
@@ -19,21 +20,6 @@ class SongResponse(SongBase):
     position: int
 
     model_config = ConfigDict(from_attributes=True)
-
-
-class RoomCreate(BaseModel):
-    name: str
-
-
-class RoomResponse(BaseModel):
-    id: str
-    name: str
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class RoomDetailResponse(RoomResponse):
-    songs: list[SongResponse]
 
 
 class SongMoveRequest(BaseModel):

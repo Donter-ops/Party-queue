@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from database import Base
+from core.database import Base
 
 
 class Room(Base):
@@ -36,6 +36,7 @@ class Song(Base):
     artist: Mapped[str] = mapped_column(String, nullable=False)
     added_by: Mapped[str] = mapped_column(String, nullable=False)
     source: Mapped[str] = mapped_column(String, nullable=False)
+    external_url: Mapped[str | None] = mapped_column(String, nullable=True)
     position: Mapped[int] = mapped_column(nullable=False)
     room_id: Mapped[str] = mapped_column(
         String,

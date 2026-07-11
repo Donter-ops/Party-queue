@@ -11,7 +11,7 @@ export default {
         gold: "#f2c14e",
       },
       fontFamily: {
-        sans: ["Poppins", "ui-sans-serif", "system-ui", "sans-serif"],
+        sans: ["Space Grotesk", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       boxShadow: {
         party: "0 24px 80px rgba(31, 29, 54, 0.18)",
