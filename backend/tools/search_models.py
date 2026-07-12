@@ -33,3 +33,4 @@ class SearchResult:
     provider: str
     matches: list[ProviderSong] = field(default_factory=list)
     total_matches: int = 0
+    confidence: float = 0.0

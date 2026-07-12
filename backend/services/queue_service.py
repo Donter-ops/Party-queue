@@ -41,6 +41,36 @@ class QueueService:
             .first()
         )
 
+    def list_songs(self, room_id: str) -> list[models.Song]:
+        """Return all room songs ordered by queue position."""
+
+        return (
+            self.db.query(models.Song)
+            .filter(models.Song.room_id == room_id)
+            .order_by(models.Song.position.asc())
+            .all()
+        )
+
+    def get_next_song(self, room_id: str, current_position: int | None) -> models.Song | None:
+        """Return the next queued song after the provided position.
+
+        A ``None`` position is treated as a request for the first queue entry,
+        which keeps the method useful for both session bootstrap and forward
+        playback transitions.
+        """
+
+        songs = self.list_songs(room_id)
+        if not songs:
+            return None
+
+        if current_position is None:
+            return songs[0]
+
+        return next(
+            (song for song in songs if song.position > current_position),
+            None,
+        )
+
     def delete_song(self, room_id: str, song_id: str) -> None:
         db_song = self.get_song(room_id=room_id, song_id=song_id)
         if db_song is None:
@@ -69,12 +99,7 @@ class QueueService:
         song_id: str,
         move_request: schemas.SongMoveRequest,
     ) -> models.Song:
-        songs = (
-            self.db.query(models.Song)
-            .filter(models.Song.room_id == room_id)
-            .order_by(models.Song.position.asc())
-            .all()
-        )
+        songs = self.list_songs(room_id)
 
         current_index = next((index for index, song in enumerate(songs) if song.id == song_id), None)
         if current_index is None:

@@ -48,8 +48,39 @@ class OrchestratorAgent(BaseAgent):
         self.reflect(decision)
         return decision
 
+    def search(self, request: SearchRequest) -> SearchResult:
+        """Execute the deterministic search flow through the cognitive pipeline.
+
+        This method gives services a direct, typed way to use the agent for
+        search orchestration while keeping the same internal observe-think-plan-
+        execute-reflect sequence that future AI-backed agent behavior will use.
+        """
+
+        observation = self.observe(request)
+        thought = self.think(observation)
+        plan = self.plan(thought)
+        result = self.execute_search(plan)
+        self.reflect_search(result)
+        return result
+
     def observe(self, payload: Any) -> Observation:
         """Collect all currently available facts about the incoming payload."""
+        if isinstance(payload, SearchRequest):
+            normalized_query = payload.query.strip()
+            facts = [
+                f"Search query received: '{normalized_query}'.",
+                f"Target provider is '{payload.provider}'.",
+                f"Requested result limit is {payload.limit}.",
+            ]
+            return Observation(
+                payload_type=type(payload).__name__,
+                source=payload.provider,
+                provider_hint=payload.provider,
+                has_external_url=False,
+                facts=facts,
+                metadata={"payload": payload},
+            )
+
         if isinstance(payload, schemas.SongCreate):
             provider_hint = payload.source if payload.source != "manual" else None
             facts = [
@@ -68,6 +99,23 @@ class OrchestratorAgent(BaseAgent):
 
     def think(self, observation: Observation) -> Thought:
         """Analyze the observation and derive a deterministic thought."""
+        search_payload: SearchRequest | None = None
+        if isinstance(observation.metadata.get("payload"), SearchRequest):
+            search_payload = observation.metadata["payload"]
+            return Thought(
+                summary="Search request should be executed through SearchTool.",
+                provider=search_payload.provider,
+                strategy_hint=DecisionStrategy.SEARCH_EQUIVALENT.value,
+                reasoning=[
+                    *observation.facts,
+                    "SearchRequest payload detected.",
+                ],
+                metadata={
+                    "observation": observation,
+                    "search_request": search_payload,
+                },
+            )
+
         provider = observation.provider_hint
         payload: schemas.SongCreate | None = observation.metadata.get("payload")
         search_query = None
@@ -139,6 +187,16 @@ class OrchestratorAgent(BaseAgent):
             tool_result=tool_result,
         )
 
+    def execute_search(self, plan: ExecutionPlan) -> SearchResult:
+        """Execute a plan specifically for search and return typed results."""
+
+        tool: BaseTool = plan.metadata["tool"]
+        search_request: SearchRequest = plan.metadata["search_request"]
+        tool_result = tool.run(search_request)
+        if not isinstance(tool_result, SearchResult):
+            raise TypeError("Search execution must return SearchResult.")
+        return tool_result
+
     def reflect(self, decision: AgentDecision) -> Reflection:
         """Evaluate whether the emitted decision appears internally consistent."""
         success = decision.strategy != DecisionStrategy.NO_PLAYABLE_SOURCE
@@ -151,6 +209,20 @@ class OrchestratorAgent(BaseAgent):
             summary="Deterministic reflection completed.",
             notes=notes,
             metadata={"decision": decision},
+        )
+
+    def reflect_search(self, result: SearchResult) -> Reflection:
+        """Evaluate whether a search execution produced usable results."""
+
+        return Reflection(
+            success=result.total_matches > 0,
+            summary="Deterministic search reflection completed.",
+            notes=[
+                f"Search provider: {result.provider}.",
+                f"Search returned {result.total_matches} matches.",
+                f"Search confidence: {result.confidence:.2f}.",
+            ],
+            metadata={"search_result": result},
         )
 
     def _build_decision(
@@ -230,6 +302,7 @@ class OrchestratorAgent(BaseAgent):
             "query": result.query,
             "provider": result.provider,
             "total_matches": result.total_matches,
+            "confidence": result.confidence,
             "matches": [
                 {
                     "provider": match.provider,

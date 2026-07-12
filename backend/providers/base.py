@@ -13,6 +13,7 @@ class ProviderSong:
     title: str
     artist: str
     external_url: str | None = None
+    confidence: float | None = None
 
 
 class MusicProvider(ABC):

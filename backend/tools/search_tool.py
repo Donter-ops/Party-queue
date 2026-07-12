@@ -20,9 +20,11 @@ class SearchTool(BaseTool):
         """Execute a provider search request and return normalized results."""
         provider = self.providers[payload.provider]
         matches = provider.search(payload.query)[: payload.limit]
+        confidence = 0.98 if matches else 0.0
         return SearchResult(
             query=payload.query,
             provider=payload.provider,
             matches=matches,
             total_matches=len(matches),
+            confidence=confidence,
         )

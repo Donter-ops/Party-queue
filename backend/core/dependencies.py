@@ -10,10 +10,13 @@ from core.database import get_db
 from decision.confidence import ConfidenceHelper
 from providers.local import LocalSearchProvider
 from providers.base import MusicProvider
+from providers.musicbrainz import MusicBrainzProvider
 from providers.spotify import SpotifyProvider
 from providers.youtube import YouTubeProvider
+from playback.playback_engine import PlaybackEngine
 from services.queue_service import QueueService
 from services.resolver_service import SongResolverService
+from services.search_service import SearchService
 from services.song_service import SongService
 from tools.metadata_tool import MetadataTool
 from tools.queue_tool import QueueTool
@@ -37,8 +40,10 @@ def get_music_providers() -> dict[str, MusicProvider]:
 
 def get_search_providers() -> dict[str, MusicProvider]:
     """Return the provider registry used by the search tool."""
+    musicbrainz_provider = MusicBrainzProvider()
     return {
-        "local": LocalSearchProvider(),
+        "local": musicbrainz_provider,
+        "musicbrainz": musicbrainz_provider,
     }
 
 
@@ -87,8 +92,24 @@ def get_queue_service(db: DbSession) -> QueueService:
     return QueueService(db)
 
 
+def get_playback_engine(
+    queue_service: Annotated[QueueService, Depends(get_queue_service)],
+) -> PlaybackEngine:
+    """Create the provider-agnostic playback engine for room sessions."""
+
+    return PlaybackEngine(queue_service=queue_service)
+
+
 def get_song_service(
     db: DbSession,
     resolver_service: Annotated[SongResolverService, Depends(get_song_resolver_service)],
 ) -> SongService:
     return SongService(db=db, resolver_service=resolver_service)
+
+
+def get_search_service(
+    orchestrator_agent: Annotated[OrchestratorAgent, Depends(get_orchestrator_agent)],
+) -> SearchService:
+    """Create the search service used by the search router."""
+
+    return SearchService(orchestrator_agent=orchestrator_agent)
