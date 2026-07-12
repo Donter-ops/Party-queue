@@ -8,11 +8,14 @@ from services.resolver_service import SongResolverService
 
 
 class SongService:
+    """Service responsible for persistence of queue songs."""
+
     def __init__(self, db: Session, resolver_service: SongResolverService) -> None:
         self.db = db
         self.resolver_service = resolver_service
 
     def create_song(self, room_id: str, song: schemas.SongCreate) -> models.Song:
+        """Resolve a song through the agent layer and persist it in the queue."""
         resolved_song = self.resolver_service.resolve_song(song)
         next_position = (
             self.db.query(models.Song)

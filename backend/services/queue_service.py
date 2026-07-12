@@ -8,6 +8,8 @@ import schemas
 
 
 class QueueService:
+    """Service responsible for room and queue mutation workflows."""
+
     def __init__(self, db: Session) -> None:
         self.db = db
 

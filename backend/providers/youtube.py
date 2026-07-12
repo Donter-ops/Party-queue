@@ -4,6 +4,8 @@ from providers.base import MusicProvider, ProviderSong
 
 
 class YouTubeProvider(MusicProvider):
+    """Placeholder YouTube adapter for future provider-specific logic."""
+
     def search(self, query: str) -> list[ProviderSong]:
         raise NotImplementedError("YouTube provider is not implemented yet.")
 
