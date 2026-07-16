@@ -7,6 +7,7 @@ from typing import Any
 
 import models
 
+from playback.provider_match import ProviderMatch
 from playback.playback_state import PlaybackState
 
 
@@ -41,5 +42,6 @@ class PlaybackEvent:
     event_type: PlaybackEventType
     state: PlaybackState
     song: models.Song | None = None
+    provider_match: ProviderMatch | None = None
     occurred_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     metadata: dict[str, Any] = field(default_factory=dict)

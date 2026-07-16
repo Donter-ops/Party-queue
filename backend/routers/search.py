@@ -4,31 +4,25 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
-from core.dependencies import get_search_service
+from core.dependencies import get_input_resolver_service
 from schemas.search import SearchResultResponse
-from services.search_service import SearchService
+from services.input_resolver import InputResolverService
 
 router = APIRouter()
 
-SearchServiceDep = Annotated[SearchService, Depends(get_search_service)]
+InputResolverDep = Annotated[InputResolverService, Depends(get_input_resolver_service)]
 
 
 @router.get("/search", response_model=list[SearchResultResponse])
 def search_songs(
-    q: Annotated[str, Query(min_length=1, description="User search query")],
-    search_service: SearchServiceDep,
+    input_resolver_service: InputResolverDep,
+    input: Annotated[str | None, Query(min_length=1, description="Universal song input")] = None,
+    q: Annotated[str | None, Query(min_length=1, description="Backward compatible search query")] = None,
 ) -> list[SearchResultResponse]:
-    """Expose provider-backed search results through the backend API."""
+    """Expose the universal song input pipeline through the search API."""
 
-    result = search_service.search(q)
+    effective_input = (input or q or "").strip()
     return [
-        SearchResultResponse(
-            title=match.title,
-            artist=match.artist,
-            provider=match.provider,
-            confidence=match.confidence if match.confidence is not None else result.confidence,
-            external_id=match.provider_id,
-            external_url=match.external_url,
-        )
-        for match in result.matches
+        song.to_response()
+        for song in input_resolver_service.resolve(effective_input)
     ]

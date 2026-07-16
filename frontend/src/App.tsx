@@ -2,6 +2,7 @@ import axios from "axios";
 import { useEffect, useMemo, useState, type JSX } from "react";
 
 import { ApplicationShell } from "./components/layout/application-shell";
+import { ConnectSpotifyScreen } from "./components/layout/connect-spotify-screen";
 import { CreateRoomScreen } from "./components/layout/create-room-screen";
 import { RoomDashboard } from "./components/layout/room-dashboard";
 import type { CreateSongPayload, Room, RoomDetail } from "./types";
@@ -18,6 +19,7 @@ function getInitialRoomId(): string | null {
 }
 
 export function App(): JSX.Element {
+  const pathname = window.location.pathname;
   const [room, setRoom] = useState<RoomDetail | null>(null);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [isRefreshingRoom, setIsRefreshingRoom] = useState(false);
@@ -196,6 +198,20 @@ export function App(): JSX.Element {
   const memberCount = room
     ? new Set(room.songs.map((song) => song.added_by.trim()).filter(Boolean)).size
     : 0;
+
+  if (pathname === "/connect-spotify") {
+    const params = new URLSearchParams(window.location.search);
+    const statusParam = params.get("status");
+    const status =
+      statusParam === "success" || statusParam === "error" ? statusParam : "idle";
+    const errorMessage = params.get("error");
+
+    return (
+      <ApplicationShell memberCount={0} roomName="Spotify Host">
+        <ConnectSpotifyScreen errorMessage={errorMessage} status={status} />
+      </ApplicationShell>
+    );
+  }
 
   return (
     <ApplicationShell memberCount={memberCount} roomName={room?.name}>

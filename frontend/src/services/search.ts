@@ -9,13 +9,13 @@ export interface SearchResultItem {
 
 const apiBaseUrl = `${window.location.protocol}//${window.location.hostname}:8000`;
 
-export async function searchSongs(query: string): Promise<SearchResultItem[]> {
-  const trimmedQuery = query.trim();
-  if (!trimmedQuery) {
+export async function searchSongs(input: string): Promise<SearchResultItem[]> {
+  const trimmedInput = input.trim();
+  if (!trimmedInput) {
     return [];
   }
 
-  const response = await fetch(`${apiBaseUrl}/search?q=${encodeURIComponent(trimmedQuery)}`);
+  const response = await fetch(`${apiBaseUrl}/search?input=${encodeURIComponent(trimmedInput)}`);
   if (!response.ok) {
     throw new Error("Search request failed.");
   }
