@@ -72,3 +72,19 @@ def init_db() -> None:
                     "ALTER TABLE songs ADD COLUMN external_url VARCHAR"
                 )
             )
+
+    if "songs" in inspector.get_table_names() and "resolution_confidence" not in song_columns:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "ALTER TABLE songs ADD COLUMN resolution_confidence FLOAT"
+                )
+            )
+
+    if "songs" in inspector.get_table_names() and "resolution_reason" not in song_columns:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "ALTER TABLE songs ADD COLUMN resolution_reason VARCHAR"
+                )
+            )

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import Float, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from core.database import Base
@@ -37,6 +37,8 @@ class Song(Base):
     added_by: Mapped[str] = mapped_column(String, nullable=False)
     source: Mapped[str] = mapped_column(String, nullable=False)
     external_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    resolution_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    resolution_reason: Mapped[str | None] = mapped_column(String, nullable=True)
     position: Mapped[int] = mapped_column(nullable=False)
     room_id: Mapped[str] = mapped_column(
         String,

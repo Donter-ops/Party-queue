@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 from urllib.request import Request, urlopen
 
 from auth.spotify_session import SpotifySession, SpotifySessionStore
@@ -173,6 +173,12 @@ class SpotifyPlaybackClient:
 
         if spotify_track_id.startswith("spotify:track:"):
             return spotify_track_id
+        if spotify_track_id.startswith("http://") or spotify_track_id.startswith("https://"):
+            parsed = urlparse(spotify_track_id)
+            if "open.spotify.com" in parsed.netloc:
+                path_parts = [part for part in parsed.path.split("/") if part]
+                if len(path_parts) >= 2 and path_parts[0] == "track":
+                    return f"spotify:track:{path_parts[1]}"
         return f"spotify:track:{spotify_track_id}"
 
     @staticmethod

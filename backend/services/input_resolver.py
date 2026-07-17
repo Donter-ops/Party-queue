@@ -151,7 +151,23 @@ class InputResolverService:
         placeholder result when no MusicBrainz match is found.
         """
 
-        _ = self.spotify_provider
+        try:
+            spotify_song = self.spotify_provider.resolve(resolved_input.raw_input)
+        except (RuntimeError, ValueError):
+            spotify_song = None
+
+        if spotify_song is not None:
+            return [
+                CanonicalSong(
+                    title=spotify_song.title,
+                    artist=spotify_song.artist,
+                    provider="spotify",
+                    confidence=spotify_song.confidence or 1.0,
+                    external_id=spotify_song.provider_id,
+                    external_url=spotify_song.external_url or resolved_input.external_url,
+                )
+            ]
+
         search_result = self._search_musicbrainz(query=resolved_input.external_id or "", limit=limit)
         if search_result.matches:
             return self._canonicalize_search_result(
@@ -179,7 +195,23 @@ class InputResolverService:
     ) -> list[CanonicalSong]:
         """Resolve a YouTube or YouTube Music link into canonical song candidates."""
 
-        _ = self.youtube_provider
+        try:
+            youtube_song = self.youtube_provider.resolve(resolved_input.raw_input)
+        except (RuntimeError, ValueError):
+            youtube_song = None
+
+        if youtube_song is not None:
+            return [
+                CanonicalSong(
+                    title=youtube_song.title,
+                    artist=youtube_song.artist,
+                    provider="youtube",
+                    confidence=youtube_song.confidence or 1.0,
+                    external_id=youtube_song.provider_id,
+                    external_url=youtube_song.external_url or resolved_input.external_url,
+                )
+            ]
+
         search_result = self._search_musicbrainz(query=resolved_input.external_id or "", limit=limit)
         if search_result.matches:
             return self._canonicalize_search_result(
@@ -283,12 +315,22 @@ class InputResolverService:
         """Extract a YouTube or YouTube Music video identifier."""
 
         parsed = urlparse(user_input)
+        if parsed.netloc == "youtu.be":
+            candidate = parsed.path.lstrip("/").split("/", 1)[0]
+            return candidate or None
+
         if parsed.netloc not in {"music.youtube.com", "www.youtube.com", "youtube.com"}:
             return None
 
         query_params = parse_qs(parsed.query)
         video_id = query_params.get("v", [None])[0]
-        return video_id
+        if video_id:
+            return video_id
+
+        path_parts = [part for part in parsed.path.split("/") if part]
+        if len(path_parts) >= 2 and path_parts[0] in {"embed", "shorts"}:
+            return path_parts[1]
+        return None
 
     @staticmethod
     def _extract_apple_track_id(user_input: str) -> str | None:

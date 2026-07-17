@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type JSX } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type JSX } from "react";
 import { Plus } from "lucide-react";
 
 import { searchSongs, type SearchResultItem } from "../../services/search";
@@ -13,17 +13,15 @@ interface AddSongFormProps {
 
 interface SongFormState {
   query: string;
-  title: string;
-  artist: string;
   added_by: string;
 }
 
 const initialFormState: SongFormState = {
   query: "",
-  title: "",
-  artist: "",
   added_by: "",
 };
+
+const urlPattern = /^(https?:\/\/|spotify:track:)/i;
 
 export function AddSongForm({
   initialGuestName = "",
@@ -37,6 +35,7 @@ export function AddSongForm({
   const [isSearching, setIsSearching] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
+  const lastAutoSubmittedInputRef = useRef<string | null>(null);
 
   useEffect(() => {
     setFormState((currentState) =>
@@ -52,12 +51,11 @@ export function AddSongForm({
   const normalizedFormState = useMemo(
     () => ({
       query: formState.query.trim(),
-      title: formState.title.trim(),
-      artist: formState.artist.trim(),
       added_by: formState.added_by.trim(),
     }),
     [formState],
   );
+  const isUrlInput = urlPattern.test(normalizedFormState.query);
 
   useEffect(() => {
     const searchQuery = normalizedFormState.query;
@@ -74,9 +72,24 @@ export function AddSongForm({
           setIsSearching(true);
           const results = await searchSongs(searchQuery);
           setSearchResults(results);
+
+          const autoSubmitKey = `${searchQuery}:${normalizedFormState.added_by}`;
+          if (
+            urlPattern.test(searchQuery) &&
+            normalizedFormState.added_by &&
+            results.length > 0 &&
+            lastAutoSubmittedInputRef.current !== autoSubmitKey
+          ) {
+            lastAutoSubmittedInputRef.current = autoSubmitKey;
+            await submitSelectedResult(results[0], normalizedFormState.added_by);
+          }
         } catch {
           setSearchResults([]);
-          setValidationMessage("Search could not be completed.");
+          setValidationMessage(
+            urlPattern.test(searchQuery)
+              ? "Link could not be resolved."
+              : "Search could not be completed.",
+          );
         } finally {
           setIsSearching(false);
         }
@@ -86,10 +99,13 @@ export function AddSongForm({
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [normalizedFormState.query]);
+  }, [normalizedFormState.added_by, normalizedFormState.query]);
 
   function handleChange(field: keyof SongFormState, value: string): void {
     setValidationMessage(null);
+    if (field === "query") {
+      lastAutoSubmittedInputRef.current = null;
+    }
     setFormState((currentState) => ({
       ...currentState,
       [field]: value,
@@ -97,45 +113,35 @@ export function AddSongForm({
   }
 
   async function submitSong(): Promise<void> {
-    if (
-      !normalizedFormState.title ||
-      !normalizedFormState.artist ||
-      !normalizedFormState.added_by
-    ) {
-      setValidationMessage("Please complete title, artist, and added by.");
+    if (!normalizedFormState.added_by) {
+      setValidationMessage("Please enter who is adding the song.");
       return;
     }
 
-    try {
-      setIsSubmitting(true);
-      await onSubmit({
-        title: normalizedFormState.title,
-        artist: normalizedFormState.artist,
-        added_by: normalizedFormState.added_by,
-        source: "manual",
-        external_url: null,
-      });
-
-      setFormState({
-        ...initialFormState,
-        added_by: normalizedFormState.added_by,
-      });
-      setSearchResults([]);
-      setValidationMessage(null);
-    } finally {
-      setIsSubmitting(false);
+    if (!normalizedFormState.query) {
+      setValidationMessage("Please enter a song title or paste a link.");
+      return;
     }
+
+    if (searchResults.length === 0) {
+      setValidationMessage(
+        isUrlInput
+          ? "This link could not be resolved yet."
+          : "Select a search result to add it to the queue.",
+      );
+      return;
+    }
+
+    await submitSelectedResult(searchResults[0], normalizedFormState.added_by);
   }
 
-  async function submitSelectedResult(result: SearchResultItem): Promise<void> {
-    const addedBy = normalizedFormState.added_by;
+  async function submitSelectedResult(
+    result: SearchResultItem,
+    addedByOverride?: string,
+  ): Promise<void> {
+    const addedBy = addedByOverride ?? normalizedFormState.added_by;
     if (!addedBy) {
       setValidationMessage("Please enter who is adding the song first.");
-      setFormState((currentState) => ({
-        ...currentState,
-        title: result.title,
-        artist: result.artist,
-      }));
       return;
     }
 
@@ -154,6 +160,7 @@ export function AddSongForm({
         added_by: addedBy,
       });
       setSearchResults([]);
+      lastAutoSubmittedInputRef.current = null;
     } finally {
       setIsSubmitting(false);
     }
@@ -168,14 +175,14 @@ export function AddSongForm({
     <form className="space-y-4" onSubmit={(event) => void handleSubmit(event)}>
       <div className="space-y-2">
         <label className="text-sm font-medium text-slate-300" htmlFor="song-search">
-          Search
+          Song or link
         </label>
         <Input
           id="song-search"
           onChange={(event) => {
             handleChange("query", event.target.value);
           }}
-          placeholder="Search for a song..."
+          placeholder="Search for a song or paste a YouTube / Spotify link..."
           value={formState.query}
         />
       </div>
@@ -184,19 +191,19 @@ export function AddSongForm({
         <div className="space-y-2">
           {isSearching ? (
             <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm text-slate-400">
-              Searching...
+              {isUrlInput ? "Resolving link..." : "Searching..."}
             </div>
           ) : null}
 
           {!isSearching && searchResults.length === 0 ? (
             <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm text-slate-400">
-              No matches found.
+              {isUrlInput ? "No playable song found for this link." : "No matches found."}
             </div>
           ) : null}
 
           {searchResults.map((song) => (
             <button
-              key={`${song.provider}-${song.artist}-${song.title}`}
+              key={`${song.provider}-${song.external_id}`}
               className="flex w-full items-center justify-between rounded-2xl border border-white/8 bg-white/[0.03] p-4 text-left transition hover:border-white/16 hover:bg-white/[0.05]"
               disabled={isSubmitting}
               onClick={() => {
@@ -217,34 +224,6 @@ export function AddSongForm({
       ) : null}
 
       <div className="grid gap-4">
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-300" htmlFor="song-title">
-            Title
-          </label>
-          <Input
-            id="song-title"
-            onChange={(event) => {
-              handleChange("title", event.target.value);
-            }}
-            placeholder="Nights"
-            value={formState.title}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-300" htmlFor="song-artist">
-            Artist
-          </label>
-          <Input
-            id="song-artist"
-            onChange={(event) => {
-              handleChange("artist", event.target.value);
-            }}
-            placeholder="Frank Ocean"
-            value={formState.artist}
-          />
-        </div>
-
         <div className="space-y-2">
           <label className="text-sm font-medium text-slate-300" htmlFor="song-added-by">
             Added by
@@ -268,7 +247,7 @@ export function AddSongForm({
 
       <Button className="w-full gap-2" disabled={isSubmitting} size="lg" type="submit">
         <Plus className="h-4 w-4" />
-        {isSubmitting ? "Adding song..." : "Add to queue"}
+        {isSubmitting ? "Adding song..." : isUrlInput ? "Add link to queue" : "Add to queue"}
       </Button>
     </form>
   );

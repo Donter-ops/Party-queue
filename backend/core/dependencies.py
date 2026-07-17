@@ -22,7 +22,9 @@ from playback.playback_engine import PlaybackEngine
 from playback.playback_resolver import PlaybackResolver
 from playback.playback_strategy import PlaybackStrategy
 from playback.provider_resolver import ProviderResolver
+from providers.youtube_playback import YouTubePlaybackProvider
 from services.input_resolver import InputResolverService
+from services.playback_service import PlaybackService
 from services.queue_service import QueueService
 from services.resolver_service import SongResolverService
 from services.search_service import SearchService
@@ -91,13 +93,6 @@ def get_orchestrator_agent(
     )
 
 
-def get_song_resolver_service(
-    orchestrator_agent: Annotated[OrchestratorAgent, Depends(get_orchestrator_agent)],
-) -> SongResolverService:
-    """Create the song resolver service backed by the orchestration agent."""
-    return SongResolverService(orchestrator_agent)
-
-
 def get_queue_service(db: DbSession) -> QueueService:
     return QueueService(db)
 
@@ -163,14 +158,24 @@ def get_spotify_auth_service(
 def get_host_capabilities() -> HostCapabilities:
     """Return the future host playback capabilities for the local environment."""
 
-    return HostCapabilities(
-        supported_providers=(
+    spotify_enabled = get_spotify_session_store().spotify_enabled
+    supported_providers = (
+        (
             HostProvider.SPOTIFY,
             HostProvider.YOUTUBE_MUSIC,
             HostProvider.APPLE_MUSIC,
-        ),
-        preferred_provider=HostProvider.SPOTIFY,
-        spotify_enabled=get_spotify_session_store().spotify_enabled,
+        )
+        if spotify_enabled
+        else (
+            HostProvider.YOUTUBE_MUSIC,
+            HostProvider.APPLE_MUSIC,
+        )
+    )
+
+    return HostCapabilities(
+        supported_providers=supported_providers,
+        preferred_provider=HostProvider.SPOTIFY if spotify_enabled else HostProvider.YOUTUBE_MUSIC,
+        spotify_enabled=spotify_enabled,
     )
 
 
@@ -225,6 +230,40 @@ def get_playback_engine(
         playback_resolver=playback_resolver,
         host_capabilities=host_capabilities,
         spotify_playback_client=spotify_playback_client,
+    )
+
+
+def get_youtube_playback_provider() -> YouTubePlaybackProvider:
+    """Create the YouTube playback metadata helper for the web player."""
+
+    return YouTubePlaybackProvider()
+
+
+def get_playback_service(
+    playback_engine: Annotated[PlaybackEngine, Depends(get_playback_engine)],
+    queue_service: Annotated[QueueService, Depends(get_queue_service)],
+    youtube_playback_provider: Annotated[YouTubePlaybackProvider, Depends(get_youtube_playback_provider)],
+) -> PlaybackService:
+    """Create the playback application service used by API routes."""
+
+    return PlaybackService(
+        playback_engine=playback_engine,
+        queue_service=queue_service,
+        youtube_playback_provider=youtube_playback_provider,
+    )
+
+
+def get_song_resolver_service(
+    orchestrator_agent: Annotated[OrchestratorAgent, Depends(get_orchestrator_agent)],
+    host_capabilities: Annotated[HostCapabilities, Depends(get_host_capabilities)],
+) -> SongResolverService:
+    """Create the song resolver service backed by the orchestration agent."""
+
+    return SongResolverService(
+        orchestrator_agent=orchestrator_agent,
+        host_capabilities=host_capabilities,
+        spotify_provider=SpotifyProvider(),
+        youtube_provider=YouTubeProvider(),
     )
 
 

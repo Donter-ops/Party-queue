@@ -16,7 +16,8 @@ class SongService:
 
     def create_song(self, room_id: str, song: schemas.SongCreate) -> models.Song:
         """Resolve a song through the agent layer and persist it in the queue."""
-        resolved_song = self.resolver_service.resolve_song(song)
+        resolved_result = self.resolver_service.resolve_song_for_queue(song)
+        resolved_song = resolved_result.song
         next_position = (
             self.db.query(models.Song)
             .filter(models.Song.room_id == room_id)
@@ -25,6 +26,8 @@ class SongService:
         db_song = models.Song(
             room_id=room_id,
             position=next_position,
+            resolution_confidence=resolved_result.resolution_confidence,
+            resolution_reason=resolved_result.resolution_reason,
             **resolved_song.model_dump(),
         )
         self.db.add(db_song)

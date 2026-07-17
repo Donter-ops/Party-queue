@@ -5,7 +5,7 @@ import { ApplicationShell } from "./components/layout/application-shell";
 import { ConnectSpotifyScreen } from "./components/layout/connect-spotify-screen";
 import { CreateRoomScreen } from "./components/layout/create-room-screen";
 import { RoomDashboard } from "./components/layout/room-dashboard";
-import type { CreateSongPayload, Room, RoomDetail } from "./types";
+import type { CreateSongPayload, PlaybackSession, Room, RoomDetail } from "./types";
 
 const apiBaseUrl = `${window.location.protocol}//${window.location.hostname}:8000`;
 
@@ -24,6 +24,7 @@ export function App(): JSX.Element {
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [isRefreshingRoom, setIsRefreshingRoom] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [playbackSession, setPlaybackSession] = useState<PlaybackSession | null>(null);
   const [savedGuestName, setSavedGuestName] = useState("");
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
 
@@ -41,6 +42,7 @@ export function App(): JSX.Element {
     }
 
     void refreshRoom(roomId);
+    void refreshPlayback(roomId);
   }, []);
 
   useEffect(() => {
@@ -54,6 +56,7 @@ export function App(): JSX.Element {
 
     const intervalId = window.setInterval(() => {
       void refreshRoom(room.id, { silent: true });
+      void refreshPlayback(room.id, { silent: true });
     }, 15000);
 
     return () => {
@@ -64,12 +67,21 @@ export function App(): JSX.Element {
   useEffect(() => {
     if (!room) {
       window.history.replaceState({}, "", window.location.pathname);
+      setPlaybackSession(null);
       return;
     }
 
     const nextUrl = `${window.location.pathname}?room=${room.id}`;
     window.history.replaceState({}, "", nextUrl);
   }, [room]);
+
+  useEffect(() => {
+    if (!room) {
+      return;
+    }
+
+    void refreshPlayback(room.id);
+  }, [room?.id]);
 
   const roomShareUrl = useMemo(() => {
     if (!room) {
@@ -90,6 +102,7 @@ export function App(): JSX.Element {
 
       const roomResponse = await api.get<RoomDetail>(`/rooms/${createResponse.data.id}`);
       setRoom(roomResponse.data);
+      setPlaybackSession(null);
     } catch {
       setErrorMessage("Could not create room. Check whether the backend is running.");
     } finally {
@@ -123,6 +136,7 @@ export function App(): JSX.Element {
       setIsCreatingRoom(true);
       setErrorMessage(null);
       await refreshRoom(roomId);
+      await refreshPlayback(roomId);
     } finally {
       setIsCreatingRoom(false);
     }
@@ -142,6 +156,7 @@ export function App(): JSX.Element {
 
       await api.post(`/rooms/${room.id}/songs`, payload);
       await refreshRoom(room.id);
+      await refreshPlayback(room.id, { silent: true });
     } catch {
       setErrorMessage("Could not add song.");
     }
@@ -158,6 +173,7 @@ export function App(): JSX.Element {
         new_position: nextPosition,
       });
       await refreshRoom(room.id);
+      await refreshPlayback(room.id, { silent: true });
     } catch {
       setErrorMessage("Could not move song.");
     }
@@ -172,6 +188,7 @@ export function App(): JSX.Element {
       setErrorMessage(null);
       await api.delete(`/rooms/${room.id}/songs/${songId}`);
       await refreshRoom(room.id);
+      await refreshPlayback(room.id, { silent: true });
     } catch {
       setErrorMessage("Could not remove song.");
     }
@@ -192,7 +209,84 @@ export function App(): JSX.Element {
 
   function handleLeaveRoom(): void {
     setRoom(null);
+    setPlaybackSession(null);
     setErrorMessage(null);
+  }
+
+  async function refreshPlayback(
+    roomId: string,
+    options?: { silent?: boolean },
+  ): Promise<void> {
+    try {
+      const response = await api.get<PlaybackSession | null>(`/rooms/${roomId}/playback`);
+      setPlaybackSession(response.data);
+    } catch {
+      if (!options?.silent) {
+        setErrorMessage("Could not load playback.");
+      }
+    }
+  }
+
+  async function startPlayback(roomId: string): Promise<void> {
+    try {
+      const response = await api.post<PlaybackSession>(`/rooms/${roomId}/playback/start`);
+      setPlaybackSession(response.data);
+      setErrorMessage(null);
+    } catch {
+      setErrorMessage("Could not start playback.");
+    }
+  }
+
+  async function pausePlayback(roomId: string): Promise<void> {
+    try {
+      const response = await api.post<PlaybackSession>(`/rooms/${roomId}/playback/pause`);
+      setPlaybackSession(response.data);
+      setErrorMessage(null);
+    } catch {
+      setErrorMessage("Could not pause playback.");
+    }
+  }
+
+  async function resumePlayback(roomId: string): Promise<void> {
+    try {
+      const response = await api.post<PlaybackSession>(`/rooms/${roomId}/playback/resume`);
+      setPlaybackSession(response.data);
+      setErrorMessage(null);
+    } catch {
+      setErrorMessage("Could not resume playback.");
+    }
+  }
+
+  async function handlePlaybackFinished(): Promise<void> {
+    if (!room) {
+      return;
+    }
+
+    try {
+      const response = await api.post<PlaybackSession>(`/rooms/${room.id}/playback/finish`);
+      setPlaybackSession(response.data);
+      setErrorMessage(null);
+    } catch {
+      setErrorMessage("Could not advance playback.");
+    }
+  }
+
+  async function handlePlaybackToggle(): Promise<void> {
+    if (!room) {
+      return;
+    }
+
+    if (playbackSession?.state === "PLAYING") {
+      await pausePlayback(room.id);
+      return;
+    }
+
+    if (playbackSession?.state === "PAUSED") {
+      await resumePlayback(room.id);
+      return;
+    }
+
+    await startPlayback(room.id);
   }
 
   const memberCount = room
@@ -219,6 +313,7 @@ export function App(): JSX.Element {
         <RoomDashboard
           errorMessage={errorMessage}
           isRefreshing={isRefreshingRoom}
+          playbackSession={playbackSession}
           room={room}
           roomShareUrl={roomShareUrl}
           savedGuestName={savedGuestName}
@@ -227,6 +322,8 @@ export function App(): JSX.Element {
           onDeleteSong={handleDeleteSong}
           onLeaveRoom={handleLeaveRoom}
           onMoveSong={handleMoveSong}
+          onPlaybackFinished={handlePlaybackFinished}
+          onPlaybackToggle={handlePlaybackToggle}
           onRefreshRoom={() => refreshRoom(room.id)}
         />
       ) : (
