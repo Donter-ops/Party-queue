@@ -123,14 +123,16 @@ class SpotifyProvider(MusicProvider):
         """Normalize one Spotify track payload into a provider song."""
 
         artists = track.get("artists", [])
-        artist_names = ", ".join(
+        artist_list = [
             str(artist.get("name", "")).strip()
             for artist in artists
             if str(artist.get("name", "")).strip()
-        )
+        ]
+        artist_names = ", ".join(artist_list)
         external_url = str(track.get("external_urls", {}).get("spotify", "")).strip() or None
         popularity = track.get("popularity")
         confidence = default_confidence
+        duration_ms = SpotifyProvider._extract_duration_ms(track.get("duration_ms"))
         if isinstance(popularity, int):
             confidence = max(default_confidence, min(1.0, popularity / 100.0))
 
@@ -141,16 +143,29 @@ class SpotifyProvider(MusicProvider):
             artist=artist_names or "Unknown Artist",
             external_url=external_url,
             confidence=confidence,
-            duration_seconds=self._extract_duration_seconds(track.get("duration_ms")),
+            artists=artist_list or None,
+            album=str(track.get("album", {}).get("name", "")).strip() or None,
+            duration_ms=duration_ms,
+            duration_seconds=self._extract_duration_seconds(duration_ms),
+            isrc=str(track.get("external_ids", {}).get("isrc", "")).strip() or None,
         )
+
+    @staticmethod
+    def _extract_duration_ms(raw_duration_ms: object) -> int | None:
+        """Normalize Spotify duration milliseconds."""
+
+        try:
+            duration_ms = int(raw_duration_ms)
+        except (TypeError, ValueError):
+            return None
+        return max(0, duration_ms)
 
     @staticmethod
     def _extract_duration_seconds(raw_duration_ms: object) -> int | None:
         """Convert Spotify duration milliseconds into rounded seconds."""
 
-        try:
-            duration_ms = int(raw_duration_ms)
-        except (TypeError, ValueError):
+        duration_ms = SpotifyProvider._extract_duration_ms(raw_duration_ms)
+        if duration_ms is None:
             return None
         return max(0, round(duration_ms / 1000))
 

@@ -14,7 +14,11 @@ class ProviderSong:
     artist: str
     external_url: str | None = None
     confidence: float | None = None
+    artists: list[str] | None = None
+    album: str | None = None
+    duration_ms: int | None = None
     duration_seconds: int | None = None
+    isrc: str | None = None
     channel_title: str | None = None
     is_official_artist: bool = False
     is_official_music_channel: bool = False

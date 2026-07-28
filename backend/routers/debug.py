@@ -1,21 +1,29 @@
 from __future__ import annotations
 
 import json
+import os
 from typing import Annotated
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from auth.spotify_playback_client import SpotifyPlaybackClient, SpotifyPlaybackError
 from auth.spotify_session import SpotifySession
 from auth.spotify_session import SpotifySessionStore
-from core.dependencies import get_spotify_playback_client, get_spotify_session_store
+import schemas
+from core.dependencies import (
+    get_resolver_debug_service,
+    get_spotify_playback_client,
+    get_spotify_session_store,
+)
+from services.resolver_debug_service import ResolverDebugService
 
 router = APIRouter()
 
 SpotifySessionStoreDep = Annotated[SpotifySessionStore, Depends(get_spotify_session_store)]
 SpotifyPlaybackClientDep = Annotated[SpotifyPlaybackClient, Depends(get_spotify_playback_client)]
+ResolverDebugServiceDep = Annotated[ResolverDebugService, Depends(get_resolver_debug_service)]
 
 
 @router.get("/debug/spotify")
@@ -62,6 +70,18 @@ def debug_spotify(
         "spotify_api_response": spotify_api_response,
         "normalized_devices": normalized_devices,
     }
+
+
+@router.get("/rooms/{room_id}/resolver/debug/latest", response_model=schemas.ResolverDebugTrace | None)
+def debug_latest_resolver_trace(
+    room_id: str,
+    resolver_debug_service: ResolverDebugServiceDep,
+) -> schemas.ResolverDebugTrace | None:
+    """Return the latest room-scoped resolver trace in development mode only."""
+
+    if not _is_development_mode():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    return resolver_debug_service.get_latest(room_id)
 
 
 def _fetch_raw_spotify_devices(session: SpotifySession) -> dict[str, object]:
@@ -114,3 +134,9 @@ def _read_error_body(error: HTTPError) -> str | None:
     if not payload:
         return None
     return payload.decode("utf-8", errors="replace")
+
+
+def _is_development_mode() -> bool:
+    """Return whether development-only debug endpoints should be exposed."""
+
+    return os.getenv("PARTYQUEUE_ENV", "development").strip().lower() != "production"

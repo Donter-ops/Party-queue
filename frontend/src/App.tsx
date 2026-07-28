@@ -5,7 +5,13 @@ import { ApplicationShell } from "./components/layout/application-shell";
 import { ConnectSpotifyScreen } from "./components/layout/connect-spotify-screen";
 import { CreateRoomScreen } from "./components/layout/create-room-screen";
 import { RoomDashboard } from "./components/layout/room-dashboard";
-import type { CreateSongPayload, PlaybackSession, Room, RoomDetail } from "./types";
+import type {
+  CreateSongPayload,
+  PlaybackSession,
+  ResolverDebugTrace,
+  Room,
+  RoomDetail,
+} from "./types";
 
 const apiBaseUrl = `${window.location.protocol}//${window.location.hostname}:8000`;
 
@@ -25,8 +31,11 @@ export function App(): JSX.Element {
   const [isRefreshingRoom, setIsRefreshingRoom] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [playbackSession, setPlaybackSession] = useState<PlaybackSession | null>(null);
+  const [resolverDebugTrace, setResolverDebugTrace] = useState<ResolverDebugTrace | null>(null);
   const [savedGuestName, setSavedGuestName] = useState("");
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const isDevelopment =
+    window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
 
   useEffect(() => {
     const storedGuestName = window.localStorage.getItem("partyqueue:guest-name");
@@ -43,6 +52,9 @@ export function App(): JSX.Element {
 
     void refreshRoom(roomId);
     void refreshPlayback(roomId);
+    if (isDevelopment) {
+      void refreshResolverDebug(roomId);
+    }
   }, []);
 
   useEffect(() => {
@@ -57,17 +69,21 @@ export function App(): JSX.Element {
     const intervalId = window.setInterval(() => {
       void refreshRoom(room.id, { silent: true });
       void refreshPlayback(room.id, { silent: true });
-    }, 15000);
+      if (isDevelopment) {
+        void refreshResolverDebug(room.id, { silent: true });
+      }
+    }, 3000);
 
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [autoRefreshEnabled, room]);
+  }, [autoRefreshEnabled, isDevelopment, room]);
 
   useEffect(() => {
     if (!room) {
       window.history.replaceState({}, "", window.location.pathname);
       setPlaybackSession(null);
+      setResolverDebugTrace(null);
       return;
     }
 
@@ -81,7 +97,10 @@ export function App(): JSX.Element {
     }
 
     void refreshPlayback(room.id);
-  }, [room?.id]);
+    if (isDevelopment) {
+      void refreshResolverDebug(room.id, { silent: true });
+    }
+  }, [isDevelopment, room?.id]);
 
   const roomShareUrl = useMemo(() => {
     if (!room) {
@@ -103,6 +122,7 @@ export function App(): JSX.Element {
       const roomResponse = await api.get<RoomDetail>(`/rooms/${createResponse.data.id}`);
       setRoom(roomResponse.data);
       setPlaybackSession(null);
+      setResolverDebugTrace(null);
     } catch {
       setErrorMessage("Could not create room. Check whether the backend is running.");
     } finally {
@@ -137,6 +157,9 @@ export function App(): JSX.Element {
       setErrorMessage(null);
       await refreshRoom(roomId);
       await refreshPlayback(roomId);
+      if (isDevelopment) {
+        await refreshResolverDebug(roomId);
+      }
     } finally {
       setIsCreatingRoom(false);
     }
@@ -157,6 +180,9 @@ export function App(): JSX.Element {
       await api.post(`/rooms/${room.id}/songs`, payload);
       await refreshRoom(room.id);
       await refreshPlayback(room.id, { silent: true });
+      if (isDevelopment) {
+        await refreshResolverDebug(room.id, { silent: true });
+      }
     } catch {
       setErrorMessage("Could not add song.");
     }
@@ -210,6 +236,7 @@ export function App(): JSX.Element {
   function handleLeaveRoom(): void {
     setRoom(null);
     setPlaybackSession(null);
+    setResolverDebugTrace(null);
     setErrorMessage(null);
   }
 
@@ -223,6 +250,24 @@ export function App(): JSX.Element {
     } catch {
       if (!options?.silent) {
         setErrorMessage("Could not load playback.");
+      }
+    }
+  }
+
+  async function refreshResolverDebug(
+    roomId: string,
+    options?: { silent?: boolean },
+  ): Promise<void> {
+    if (!isDevelopment) {
+      return;
+    }
+
+    try {
+      const response = await api.get<ResolverDebugTrace | null>(`/rooms/${roomId}/resolver/debug/latest`);
+      setResolverDebugTrace(response.data);
+    } catch {
+      if (!options?.silent) {
+        setResolverDebugTrace(null);
       }
     }
   }
@@ -271,6 +316,36 @@ export function App(): JSX.Element {
     }
   }
 
+  async function handlePlaybackNext(): Promise<void> {
+    if (!room) {
+      return;
+    }
+
+    try {
+      const response = await api.post<PlaybackSession>(`/rooms/${room.id}/playback/next`);
+      setPlaybackSession(response.data);
+      setErrorMessage(null);
+      await refreshRoom(room.id, { silent: true });
+    } catch {
+      setErrorMessage("Could not skip to the next song.");
+    }
+  }
+
+  async function handlePlaybackPrevious(): Promise<void> {
+    if (!room) {
+      return;
+    }
+
+    try {
+      const response = await api.post<PlaybackSession>(`/rooms/${room.id}/playback/previous`);
+      setPlaybackSession(response.data);
+      setErrorMessage(null);
+      await refreshRoom(room.id, { silent: true });
+    } catch {
+      setErrorMessage("Could not return to the previous song.");
+    }
+  }
+
   async function handlePlaybackToggle(): Promise<void> {
     if (!room) {
       return;
@@ -298,11 +373,11 @@ export function App(): JSX.Element {
     const statusParam = params.get("status");
     const status =
       statusParam === "success" || statusParam === "error" ? statusParam : "idle";
-    const errorMessage = params.get("error");
+    const connectErrorMessage = params.get("error");
 
     return (
       <ApplicationShell memberCount={0} roomName="Spotify Host">
-        <ConnectSpotifyScreen errorMessage={errorMessage} status={status} />
+        <ConnectSpotifyScreen errorMessage={connectErrorMessage} status={status} />
       </ApplicationShell>
     );
   }
@@ -314,6 +389,7 @@ export function App(): JSX.Element {
           errorMessage={errorMessage}
           isRefreshing={isRefreshingRoom}
           playbackSession={playbackSession}
+          resolverDebugTrace={resolverDebugTrace}
           room={room}
           roomShareUrl={roomShareUrl}
           savedGuestName={savedGuestName}
@@ -323,8 +399,9 @@ export function App(): JSX.Element {
           onLeaveRoom={handleLeaveRoom}
           onMoveSong={handleMoveSong}
           onPlaybackFinished={handlePlaybackFinished}
+          onPlaybackNext={handlePlaybackNext}
+          onPlaybackPrevious={handlePlaybackPrevious}
           onPlaybackToggle={handlePlaybackToggle}
-          onRefreshRoom={() => refreshRoom(room.id)}
         />
       ) : (
         <CreateRoomScreen

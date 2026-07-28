@@ -18,6 +18,8 @@ class SongCreate(SongBase):
 class SongResponse(SongBase):
     id: str
     position: int
+    resolution_confidence: float | None = None
+    resolution_reason: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

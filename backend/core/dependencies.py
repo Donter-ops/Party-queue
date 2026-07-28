@@ -26,6 +26,7 @@ from providers.youtube_playback import YouTubePlaybackProvider
 from services.input_resolver import InputResolverService
 from services.playback_service import PlaybackService
 from services.queue_service import QueueService
+from services.resolver_debug_service import ResolverDebugService
 from services.resolver_service import SongResolverService
 from services.search_service import SearchService
 from services.song_service import SongService
@@ -35,6 +36,7 @@ from tools.search_tool import SearchTool
 
 DbSession = Annotated[Session, Depends(get_db)]
 _spotify_session_store = SpotifySessionStore()
+_resolver_debug_service = ResolverDebugService()
 
 
 def get_confidence_helper() -> ConfidenceHelper:
@@ -101,6 +103,12 @@ def get_spotify_session_store() -> SpotifySessionStore:
     """Return the singleton in-memory Spotify host session store."""
 
     return _spotify_session_store
+
+
+def get_resolver_debug_service() -> ResolverDebugService:
+    """Return the singleton in-memory resolver debug store."""
+
+    return _resolver_debug_service
 
 
 def get_spotify_oauth_config() -> SpotifyOAuthConfig:
@@ -270,8 +278,13 @@ def get_song_resolver_service(
 def get_song_service(
     db: DbSession,
     resolver_service: Annotated[SongResolverService, Depends(get_song_resolver_service)],
+    resolver_debug_service: Annotated[ResolverDebugService, Depends(get_resolver_debug_service)],
 ) -> SongService:
-    return SongService(db=db, resolver_service=resolver_service)
+    return SongService(
+        db=db,
+        resolver_service=resolver_service,
+        resolver_debug_service=resolver_debug_service,
+    )
 
 
 def get_search_service(

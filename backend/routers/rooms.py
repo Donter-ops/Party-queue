@@ -5,7 +5,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 
 import schemas
-from core.dependencies import get_queue_service, get_song_service
+from core.dependencies import get_playback_service, get_queue_service, get_song_service
+from services.playback_service import PlaybackService
 from services.queue_service import QueueService
 from services.song_service import SongService
 
@@ -13,6 +14,7 @@ router = APIRouter()
 
 QueueServiceDep = Annotated[QueueService, Depends(get_queue_service)]
 SongServiceDep = Annotated[SongService, Depends(get_song_service)]
+PlaybackServiceDep = Annotated[PlaybackService, Depends(get_playback_service)]
 
 
 @router.post("/rooms", response_model=schemas.RoomResponse, status_code=status.HTTP_201_CREATED)
@@ -51,9 +53,17 @@ def delete_song_from_room(
     room_id: str,
     song_id: str,
     queue_service: QueueServiceDep,
+    playback_service: PlaybackServiceDep,
 ) -> None:
     queue_service.require_room(room_id)
+    song = queue_service.get_song(room_id=room_id, song_id=song_id)
     queue_service.delete_song(room_id=room_id, song_id=song_id)
+    if song is not None:
+        playback_service.handle_deleted_song(
+            room_id=room_id,
+            song_id=song_id,
+            deleted_position=song.position,
+        )
 
 
 @router.put("/rooms/{room_id}/songs/{song_id}/move", response_model=schemas.SongResponse)

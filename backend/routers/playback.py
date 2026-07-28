@@ -71,3 +71,13 @@ def next_playback(
     """Advance playback to the next queued item."""
 
     return playback_service.next(room_id)
+
+
+@router.post("/rooms/{room_id}/playback/previous", response_model=schemas.PlaybackSessionResponse)
+def previous_playback(
+    room_id: str,
+    playback_service: PlaybackServiceDep,
+) -> schemas.PlaybackSessionResponse:
+    """Return playback to the previous song when history exists."""
+
+    return playback_service.previous(room_id)
