@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import os
 import time
 from dataclasses import dataclass
@@ -10,6 +11,8 @@ from urllib.parse import urlencode, urlparse
 from urllib.request import Request, urlopen
 
 from providers.base import MusicProvider, ProviderSong
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -35,6 +38,9 @@ class SpotifyProvider(MusicProvider):
     REQUEST_TIMEOUT_SECONDS = 10
 
     _catalog_token: SpotifyCatalogToken | None = None
+
+    def __init__(self) -> None:
+        self.last_request_debug: dict[str, object] = {}
 
     def search(self, query: str) -> list[ProviderSong]:
         """Search Spotify tracks using the official catalog search endpoint."""
@@ -73,12 +79,39 @@ class SpotifyProvider(MusicProvider):
             headers={"Authorization": f"Bearer {token}"},
             method=method,
         )
+        self.last_request_debug = {
+            "request_url": url,
+            "http_status": None,
+            "response_body": None,
+            "parsed_json": None,
+        }
 
         try:
             with urlopen(request, timeout=self.REQUEST_TIMEOUT_SECONDS) as response:
-                return json.loads(response.read().decode("utf-8"))
-        except (HTTPError, URLError, json.JSONDecodeError) as error:
-            raise RuntimeError("Spotify catalog request failed.") from error
+                response_body = response.read().decode("utf-8")
+                self.last_request_debug["http_status"] = response.status
+                self.last_request_debug["response_body"] = response_body
+                payload = json.loads(response_body)
+                self.last_request_debug["parsed_json"] = payload
+                logger.info("Spotify request URL: %s", url)
+                logger.info("Spotify HTTP status: %s", response.status)
+                logger.info("Spotify response body: %s", response_body)
+                logger.info("Spotify parsed JSON: %s", payload)
+                return payload
+        except HTTPError as error:
+            response_body = error.read().decode("utf-8", errors="replace")
+            self.last_request_debug["http_status"] = error.code
+            self.last_request_debug["response_body"] = response_body
+            logger.exception("Spotify HTTP error for URL %s", url)
+            logger.info("Spotify HTTP status: %s", error.code)
+            logger.info("Spotify response body: %s", response_body)
+            raise
+        except URLError:
+            logger.exception("Spotify URL error for URL %s", url)
+            raise
+        except json.JSONDecodeError:
+            logger.exception("Spotify JSON parse error for URL %s", url)
+            raise
 
     def _get_catalog_token(self) -> str:
         """Return a cached Spotify client-credentials token."""

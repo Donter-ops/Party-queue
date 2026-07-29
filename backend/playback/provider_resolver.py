@@ -89,8 +89,15 @@ class ProviderResolver:
             track_id = canonical_song.external_id
             confidence = max(preferred_match.confidence, canonical_song.confidence)
         else:
-            track_id = self._build_placeholder_track_id("youtube_music", canonical_song)
-            confidence = min(preferred_match.confidence, 0.55)
+            query = f"{canonical_song.artist} {canonical_song.title}"
+            results = self.youtube_provider.search(query)
+            if results:
+                best = results[0]
+                track_id = best.provider_id
+                confidence = best.confidence
+            else:
+                track_id = None
+                confidence = 0.0
 
         return ProviderMatch(
             provider=HostProvider.YOUTUBE_MUSIC.value,

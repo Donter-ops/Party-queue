@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import base64
+from dataclasses import asdict
 import json
 import os
+import traceback
 from typing import Annotated
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -11,6 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from auth.spotify_playback_client import SpotifyPlaybackClient, SpotifyPlaybackError
 from auth.spotify_session import SpotifySession
 from auth.spotify_session import SpotifySessionStore
+from providers.spotify import SpotifyProvider
 import schemas
 from core.dependencies import (
     get_resolver_debug_service,
@@ -72,6 +77,75 @@ def debug_spotify(
     }
 
 
+@router.get("/debug/spotify/provider")
+def debug_spotify_provider() -> dict[str, object]:
+    """Verify Spotify provider configuration and client credentials access.
+
+    This endpoint bypasses resolver, playback, and MusicBrainz code paths so
+    Spotify catalog access can be validated in isolation during development.
+    """
+
+    if not _is_development_mode():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+
+    client_id = os.getenv("SPOTIFY_CLIENT_ID")
+    client_secret = os.getenv("SPOTIFY_CLIENT_SECRET")
+    redirect_uri = os.getenv("SPOTIFY_REDIRECT_URI")
+
+    provider_initialized = False
+    provider_error: str | None = None
+    try:
+        SpotifyProvider()
+        provider_initialized = True
+    except Exception as error:  # pragma: no cover - defensive diagnostic path
+        provider_error = f"{type(error).__name__}: {error}"
+
+    token_probe = _probe_spotify_client_credentials(
+        client_id=client_id,
+        client_secret=client_secret,
+    )
+
+    return {
+        "environment": {
+            "spotify_client_id_loaded": bool(client_id),
+            "spotify_client_secret_loaded": bool(client_secret),
+            "spotify_redirect_uri": redirect_uri,
+        },
+        "provider_initializes_successfully": provider_initialized,
+        "provider_initialization_error": provider_error,
+        "client_credentials": token_probe,
+    }
+
+
+@router.get("/debug/spotify/track/{track_id}")
+def debug_spotify_track(track_id: str) -> dict[str, object]:
+    """Fetch one Spotify track directly through SpotifyProvider only."""
+
+    if not _is_development_mode():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+
+    provider = SpotifyProvider()
+    normalized_track_id = track_id.strip()
+    try:
+        song = provider.get_song(normalized_track_id)
+        return {
+            "track_id": normalized_track_id,
+            "provider": "spotify",
+            "metadata": asdict(song),
+            "request_debug": provider.last_request_debug,
+            "traceback": None,
+        }
+    except Exception as error:
+        return {
+            "track_id": normalized_track_id,
+            "provider": "spotify",
+            "metadata": None,
+            "request_debug": provider.last_request_debug,
+            "exception": f"{type(error).__name__}: {error}",
+            "traceback": traceback.format_exc(),
+        }
+
+
 @router.get("/rooms/{room_id}/resolver/debug/latest", response_model=schemas.ResolverDebugTrace | None)
 def debug_latest_resolver_trace(
     room_id: str,
@@ -121,6 +195,80 @@ def _fetch_raw_spotify_devices(session: SpotifySession) -> dict[str, object]:
             "status_code": None,
             "error_message": "Spotify returned invalid JSON.",
             "response_body": None,
+        }
+
+
+def _probe_spotify_client_credentials(
+    *,
+    client_id: str | None,
+    client_secret: str | None,
+) -> dict[str, object]:
+    """Request a Spotify client-credentials token and expose the raw outcome."""
+
+    if not client_id:
+        return {
+            "success": False,
+            "http_status": None,
+            "token_received": False,
+            "expires_in": None,
+            "spotify_error_response": None,
+            "exception_message": "RuntimeError: SPOTIFY_CLIENT_ID is missing.",
+        }
+    if not client_secret:
+        return {
+            "success": False,
+            "http_status": None,
+            "token_received": False,
+            "expires_in": None,
+            "spotify_error_response": None,
+            "exception_message": "RuntimeError: SPOTIFY_CLIENT_SECRET is missing.",
+        }
+
+    basic_token = base64.b64encode(f"{client_id}:{client_secret}".encode("utf-8")).decode("utf-8")
+    body = urlencode({"grant_type": "client_credentials"}).encode("utf-8")
+    request = Request(
+        SpotifyProvider.TOKEN_URL,
+        data=body,
+        headers={
+            "Authorization": f"Basic {basic_token}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        method="POST",
+    )
+
+    try:
+        with urlopen(request, timeout=SpotifyProvider.REQUEST_TIMEOUT_SECONDS) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+            return {
+                "success": True,
+                "http_status": response.status,
+                "token_received": bool(payload.get("access_token")),
+                "expires_in": payload.get("expires_in"),
+                "spotify_error_response": None,
+                "exception_message": None,
+            }
+    except HTTPError as error:
+        error_body = _read_error_body(error)
+        try:
+            parsed_error = json.loads(error_body) if error_body else None
+        except json.JSONDecodeError:
+            parsed_error = error_body
+        return {
+            "success": False,
+            "http_status": error.code,
+            "token_received": False,
+            "expires_in": None,
+            "spotify_error_response": parsed_error,
+            "exception_message": f"{type(error).__name__}: {error}",
+        }
+    except Exception as error:  # pragma: no cover - diagnostic endpoint
+        return {
+            "success": False,
+            "http_status": None,
+            "token_received": False,
+            "expires_in": None,
+            "spotify_error_response": None,
+            "exception_message": f"{type(error).__name__}: {error}",
         }
 
 
