@@ -1,4 +1,4 @@
-# 🎵 PartyQueue
+# PartyQueue
 
 > **One Queue. Every Music Service.**
 
@@ -8,7 +8,7 @@ Instead of forcing everyone onto the same streaming platform, PartyQueue resolve
 
 ---
 
-# ✨ Features
+#Features
 
 ## Currently supported
 
@@ -23,7 +23,7 @@ Instead of forcing everyone onto the same streaming platform, PartyQueue resolve
 
 ---
 
-# 🚧 Coming Soon
+# Coming Soon
 
 - Apple Music support
 - Deezer support
@@ -37,7 +37,7 @@ See **ROADMAP.md** for the complete roadmap.
 
 ---
 
-# 💡 Why PartyQueue?
+# Why PartyQueue?
 
 Most existing group music applications only work if everyone uses the same streaming service.
 
@@ -49,9 +49,8 @@ In the future, additional providers such as Apple Music, Deezer and Amazon Music
 
 ---
 
-# 🏗️ Architecture
+#Architecture
 
-```
                 Spotify
                YouTube
            YouTube Music
@@ -70,7 +69,7 @@ In the future, additional providers such as Apple Music, Deezer and Amazon Music
                    │
                    ▼
           Host Music Provider
-```
+
 
 The application internally converts every song into a provider-independent representation before resolving it to the host's preferred music service.
 
@@ -78,7 +77,7 @@ This architecture makes PartyQueue scalable and allows new providers to be added
 
 ---
 
-# 🛠️ Tech Stack
+#Tech Stack
 
 ## Backend
 
@@ -100,7 +99,7 @@ This architecture makes PartyQueue scalable and allows new providers to be added
 
 ---
 
-# 🚀 Getting Started
+#Getting Started
 
 ## Clone the repository
 
@@ -154,7 +153,7 @@ npm run dev
 
 ---
 
-# ⚙️ Environment Variables
+#Environment Variables
 
 PartyQueue uses a local `.env` file for provider credentials.
 
@@ -168,7 +167,7 @@ Never commit your own `.env` file.
 
 ---
 
-# 🤝 Contributing
+#Contributing
 
 Contributions are welcome!
 
@@ -184,7 +183,7 @@ Whether it's fixing bugs, improving the UI, adding documentation or implementing
 
 ---
 
-# 🗺️ Roadmap
+#Roadmap
 
 The roadmap is maintained separately in
 
