@@ -495,24 +495,21 @@ class InputResolverService:
             return uri_match.group("track_id")
 
         parsed = urlparse(normalized_input)
-        netloc = parsed.netloc.strip().lower()
-        if netloc != "open.spotify.com":
+        if parsed.netloc.strip().lower() != "open.spotify.com":
             return None
 
         path_parts = [part.strip() for part in parsed.path.split("/") if part.strip()]
-
-        # Finde das Segment "track", egal an welcher Position es steht
         try:
-            track_index = next(i for i, part in enumerate(path_parts) if part.lower() == "track")
+            track_index = next(index for index, part in enumerate(path_parts) if part.lower() == "track")
         except StopIteration:
             return None
 
-        # Das nächste Segment muss die Track-ID sein
         if track_index + 1 >= len(path_parts):
             return None
 
-        track_id = path_parts[track_index + 1].rstrip("/")
+        track_id = path_parts[track_index + 1].strip().rstrip("/")
         return track_id or None
+
     @staticmethod
     def _normalize_spotify_external_url(user_input: str, track_id: str) -> str:
         """Return a canonical Spotify track URL for downstream systems."""

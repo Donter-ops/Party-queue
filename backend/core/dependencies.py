@@ -12,7 +12,6 @@ from auth.spotify_session import SpotifySessionStore
 from auth.spotify_tokens import SpotifyOAuthConfig, SpotifyTokenService
 from core.database import get_db
 from decision.confidence import ConfidenceHelper
-from providers.local import LocalSearchProvider
 from providers.base import MusicProvider
 from providers.musicbrainz import MusicBrainzProvider
 from providers.spotify import SpotifyProvider

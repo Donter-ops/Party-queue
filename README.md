@@ -1,226 +1,89 @@
-# 🎵 PartyQueue
+# PartyQueue
 
-> AI-first cross-platform music queue.
+PartyQueue is a free, open-source shared music queue for groups. It accepts songs from multiple input sources and plays them through a provider-independent playback layer.
 
-PartyQueue allows groups of friends to build a shared music queue, regardless of which music service they use.
+## Supported today
 
-Instead of forcing everyone onto the same streaming platform, PartyQueue uses an intelligent orchestration layer that resolves songs across multiple providers and plays them on the host's preferred music service.
+**Input**
 
----
+- Spotify links
+- YouTube links
+- YouTube Music links
+- Text search (MusicBrainz-backed)
 
-## ✨ Vision
+**Playback**
 
-Today's music streaming services are isolated ecosystems.
+- YouTube / YouTube Music
 
-If one friend uses Spotify and another uses YouTube Music, listening together becomes unnecessarily difficult.
+**Cross-provider**
 
-PartyQueue solves this by introducing an AI-powered orchestration layer that understands songs independently from streaming providers.
+- Spotify input can be resolved and played back via YouTube / YouTube Music.
 
-The goal is simple:
+## Planned providers
 
-- One shared queue
-- Multiple music services
-- One seamless listening experience
-
----
-
-## 🚀 Current Features
-
-### Rooms
-
-- Create party rooms
-- Join rooms via share link
-- Shared queue
-- Reordering
-- Remove songs
-
-### Search
-
-- MusicBrainz integration
-- Universal search
-- Spotify link support
-- YouTube link support
-
-### AI Architecture
-
-- Orchestrator Agent
-- Decision Engine
-- Cognitive Pipeline
-- Canonical Song model
-- Playback Strategy
-- Playback Resolver
-- Provider Resolver
-
-### Playback
-
-- Provider-independent playback architecture
-- Spotify OAuth
-- Spotify session management
-- Playback Engine
-- Provider matching
-
----
-
-## 🏗 Architecture
-
-```
-User
-
-↓
-
-Universal Input
-
-↓
-
-Input Resolver
-
-↓
-
-Orchestrator Agent
-
-↓
-
-Decision Engine
-
-↓
-
-Canonical Song
-
-↓
-
-Playback Strategy
-
-↓
-
-Playback Resolver
-
-↓
-
-Provider Resolver
-
-↓
-
-Playback Engine
-
-↓
-
-Streaming Provider
-```
-
----
-
-## 🤖 AI-First Design
-
-Unlike traditional music queue applications, PartyQueue is built around an intelligent orchestration layer.
-
-The AI Agent is responsible for:
-
-- understanding incoming music links
-- resolving metadata
-- matching songs across providers
-- selecting the best playback provider
-- preparing future cross-platform playback
-
-This allows PartyQueue to remain provider-independent.
-
----
-
-## 🛠 Tech Stack
-
-### Backend
-
-- Python
-- FastAPI
-- SQLAlchemy
-- MusicBrainz API
-
-### Frontend
-
-- React
-- TypeScript
-- Tailwind CSS
-- Vite
-
-### AI Architecture
-
-- Agent-based orchestration
-- Decision Engine
-- Cognitive Pipeline
-- Provider abstraction
-
----
-
-## 🔐 Spotify Integration
-
-Implemented:
-
-- Spotify OAuth
-- Access Token Management
-- Refresh Tokens
-- Playback API integration
-- Device discovery
-- Debug endpoints
-
-Note:
-
-Spotify playback requires a Spotify Premium account due to Spotify Web API restrictions.
-
----
-
-## 🎯 Roadmap
-
-### ✅ Completed
-
-- Shared Rooms
-- Queue Management
-- Universal Search
-- MusicBrainz Integration
-- AI Agent
-- Decision Engine
-- Playback Architecture
-- Spotify OAuth
-
-### 🚧 In Progress
-
-- YouTube Playback
-- Automatic Queue Playback
-- Canonical Song Cache
-- Multi-provider Resolution
-
-### 🔮 Planned
+These are not implemented yet:
 
 - Apple Music
 - Deezer
-- SoundCloud
-- Smart AI Matching
-- Multi-Agent Collaboration
-- Learning Resolver
-- Mobile Application
+- Amazon Music
 
----
+## Requirements
 
-## 📖 Philosophy
+- Python 3.11+
+- Node.js 20+
+- Spotify Developer app credentials
+- Optional: YouTube Data API key for richer search
 
-PartyQueue is intentionally built around simplicity.
+## Environment configuration
 
-Users should not have to think about streaming providers.
+Copy `.env.example` to `.env` in the repository root and configure:
 
-They simply add songs.
+- `SPOTIFY_CLIENT_ID` – required
+- `SPOTIFY_CLIENT_SECRET` – required
+- `SPOTIFY_REDIRECT_URI` – Spotify OAuth callback (default: `http://127.0.0.1:8000/auth/spotify/callback`)
+- `FRONTEND_SPOTIFY_REDIRECT_URI` – frontend redirect after OAuth (default: `http://127.0.0.1:5173/connect-spotify`)
+- `YOUTUBE_API_KEY` – optional; improves YouTube search
+- `PARTYQUEUE_ENV` – set to `production` to hide development debug endpoints
 
-The orchestration layer handles the rest.
+## Backend
 
----
+```bash
+cd backend
+python -m venv .venv
+.venv\Scripts\activate        # Windows
+# source .venv/bin/activate   # macOS / Linux
+pip install -r requirements.txt
+uvicorn main:app --reload
+```
 
-## 📜 License
+API: `http://127.0.0.1:8000`
+
+## Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+App: `http://127.0.0.1:5173`
+
+## Architecture
+
+```
+User input (link or search)
+  -> Input Resolver
+  -> Orchestrator Agent
+  -> Canonical Song
+  -> Playback Strategy / Resolver
+  -> Playback Engine
+  -> YouTube / YouTube Music player
+```
+
+Rooms, queue management, and playback controls are exposed through a FastAPI backend. The React frontend renders the shared queue and web player.
+
+Spotify OAuth is used for optional host-side Spotify playback. Cross-provider resolution allows Spotify links to be matched and played on YouTube when Spotify catalog access is unavailable.
+
+## License
 
 MIT License
-
----
-
-## ❤️ Project Status
-
-Current Version:
-
-**v0.1.0-alpha**
-
-PartyQueue is under active development.

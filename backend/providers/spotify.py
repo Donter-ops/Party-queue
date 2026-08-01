@@ -93,18 +93,19 @@ class SpotifyProvider(MusicProvider):
                 self.last_request_debug["response_body"] = response_body
                 payload = json.loads(response_body)
                 self.last_request_debug["parsed_json"] = payload
-                logger.info("Spotify request URL: %s", url)
-                logger.info("Spotify HTTP status: %s", response.status)
-                logger.info("Spotify response body: %s", response_body)
-                logger.info("Spotify parsed JSON: %s", payload)
                 return payload
         except HTTPError as error:
             response_body = error.read().decode("utf-8", errors="replace")
             self.last_request_debug["http_status"] = error.code
             self.last_request_debug["response_body"] = response_body
-            logger.exception("Spotify HTTP error for URL %s", url)
-            logger.info("Spotify HTTP status: %s", error.code)
-            logger.info("Spotify response body: %s", response_body)
+            if error.code in {401, 403}:
+                logger.warning(
+                    "Spotify catalog access denied (%s) for URL %s",
+                    error.code,
+                    url,
+                )
+            else:
+                logger.exception("Spotify HTTP error for URL %s", url)
             raise
         except URLError:
             logger.exception("Spotify URL error for URL %s", url)

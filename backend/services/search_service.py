@@ -17,7 +17,7 @@ class SearchService:
         self.orchestrator_agent = orchestrator_agent
 
     def search(self, query: str, limit: int = 5) -> SearchResult:
-        """Search the local provider catalog through the orchestration layer."""
+        """Search the MusicBrainz-backed catalog through the orchestration layer."""
 
         request = SearchRequest(
             query=query.strip(),
