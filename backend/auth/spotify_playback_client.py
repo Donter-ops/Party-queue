@@ -175,7 +175,8 @@ class SpotifyPlaybackClient:
             return spotify_track_id
         if spotify_track_id.startswith("http://") or spotify_track_id.startswith("https://"):
             parsed = urlparse(spotify_track_id)
-            if "open.spotify.com" in parsed.netloc:
+            hostname = parsed.hostname or ""
+            if hostname.lower() == "open.spotify.com":
                 path_parts = [part for part in parsed.path.split("/") if part]
                 if len(path_parts) >= 2 and path_parts[0] == "track":
                     return f"spotify:track:{path_parts[1]}"
