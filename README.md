@@ -53,22 +53,10 @@ In the future, additional providers such as Apple Music, Deezer and Amazon Music
 
                 Spotify
                YouTube
-           YouTube Music
+           YouTube Music   --> Input Resolver  --> Canonical Song  --> Playback Resolver  --> Host Music Provider
              Apple Music
                 Deezer
             Amazon Music
-                   │
-                   ▼
-           Input Resolver
-                   │
-                   ▼
-            Canonical Song
-                   │
-                   ▼
-          Playback Resolver
-                   │
-                   ▼
-          Host Music Provider
 
 
 The application internally converts every song into a provider-independent representation before resolving it to the host's preferred music service.
