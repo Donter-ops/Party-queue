@@ -110,7 +110,7 @@ Planned
 
 - Native Android App
 - Native iOS App
-- Shared QR room joining
+- Shared QR Code room joining
 - Better touch experience
 
 ---
