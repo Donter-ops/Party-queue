@@ -1,5 +1,5 @@
 fastapi
-sqlalchemy>=2.1.5
+sqlalchemy>=2.1.6
 pydantic>=2.14.1
 uvicorn
 python-dotenv
